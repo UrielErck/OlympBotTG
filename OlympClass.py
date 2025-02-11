@@ -9,7 +9,7 @@ class Olympiad:
     Subject: list[str] # list of names
     Events: list[dict]
     # Type: str # may be 9 (squad), ind (individual), dist (distant), any (WIP)
-    Date: dict or -1 # start and end in unix format or -1 if indefinitely
+    # Date: dict or -1 # start and end in unix format or -1 if indefinitely
     # IsVisitingSchool: bool
 
     def __str__(self):
