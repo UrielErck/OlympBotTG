@@ -227,7 +227,7 @@ def parce(SQLBase: sqlite3.Connection) -> None:
 #                     int(eventDict['end_date']),
 #                 ))
 #                 SQLBase.commit()
-#
+                Events.append(eventDict)
             olympiad.Events = Events
 
             #Save element to the base
