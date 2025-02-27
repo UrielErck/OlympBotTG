@@ -26,12 +26,14 @@ def parce(SQLBase: sqlite3.Connection) -> None:
                 CREATE TABLE IF NOT EXISTS Olympiads (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
+                grade TEXT NOT NULL,
                 level INTEGER NOT NULL,
                 rating REAL NOT NULL,
                 description TEXT NOT NULL,
                 link TEXT NOT NULL,
                 image_link TEXT NOT NULL,
-                subjects TEXT NOT NULL
+                subjects TEXT NOT NULL,
+                events TEXT NOT NULL
                 )
                 ''')
     # SQLBaseCursor.execute(f'''
@@ -230,15 +232,29 @@ def parce(SQLBase: sqlite3.Connection) -> None:
                 Events.append(eventDict)
             olympiad.Events = Events
 
+            # Add learn class
+            Num_of_Class: str = OlympPageTree.xpath('.//span[@class="classes_types_a"]')[0].text
+            Num_of_Class = Num_of_Class[:Num_of_Class.index(' ')]
+            if '–' in Num_of_Class: #Range of classes
+                div_index = Num_of_Class.index('–')
+                List_of_Classes: list = list(range(int(Num_of_Class[:div_index]), int(Num_of_Class[div_index+1:])))
+            elif ',' in Num_of_Class: #Multiple classes list
+                List_of_Classes: list = list(map(int, Num_of_Class.split(',')))
+            else: # if determened class:
+                List_of_Classes: list = [int(Num_of_Class)]
+            olympiad.YearOfStudy = List_of_Classes
+
+
             #Save element to the base
             SQLBaseCursor.execute(f'''
             INSERT OR REPLACE INTO Olympiads 
-            (id, name, level, rating, description, link, image_link, subjects, events)
+            (id, name, grade, level, rating, description, link, image_link, subjects, events)
             VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 int(olympiad.ID),
                 str(olympiad.Name),
+                str(json.dumps(olympiad.YearOfStudy)),
                 int(olympiad.Level),
                 float(olympiad.Rating),
                 str(olympiad.Description),
