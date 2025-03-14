@@ -237,7 +237,7 @@ def parce(SQLBase: sqlite3.Connection) -> None:
             Num_of_Class = Num_of_Class[:Num_of_Class.index(' ')]
             if '–' in Num_of_Class: #Range of classes
                 div_index = Num_of_Class.index('–')
-                List_of_Classes: list = list(range(int(Num_of_Class[:div_index]), int(Num_of_Class[div_index+1:])))
+                List_of_Classes: list = list(range(int(Num_of_Class[:div_index]), int(Num_of_Class[div_index+1:])+1))
             elif ',' in Num_of_Class: #Multiple classes list
                 List_of_Classes: list = list(map(int, Num_of_Class.split(',')))
             else: # if determened class:
