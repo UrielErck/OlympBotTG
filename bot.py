@@ -347,6 +347,7 @@ async def handle_level(message: types.Message):
         await send_next(chat_id, 0)
     else:
         await message.answer("По заданным фильтрам олимпиад не найдено.")
+        start_command(message)
 
 # --- Обработчики подписки, отписки и листания ---
 
@@ -361,6 +362,7 @@ async def show_subscriptions(message: types.Message):
         await message.answer(response, reply_markup=keyboard)
     else:
         await message.answer("У вас нет подписок.")
+        start_command(message)
 
 @dp.message(lambda message: message.text == "➡️ Далее")
 async def next_olympiad(message: types.Message):
@@ -371,6 +373,8 @@ async def next_olympiad(message: types.Message):
         await send_next(chat_id, index)
     else:
         await message.answer("Нет активного списка олимпиад.")
+        start_command(message)
+        
 
 @dp.message(lambda message: message.text == "✅ Подписаться")
 async def subscribe_current(message: types.Message):
@@ -384,8 +388,10 @@ async def subscribe_current(message: types.Message):
             subscribe_user(chat_id, olympiad[0])
         else:
             await message.answer("Нет активной олимпиады для подписки.")
+            start_command(message)
     else:
         await message.answer("Нет активного списка олимпиад.")
+        start_command(message)
 
 @dp.message(lambda message: message.text == "❌ Отписаться")
 async def unsubscribe_current(message: types.Message):
@@ -399,8 +405,10 @@ async def unsubscribe_current(message: types.Message):
             unsubscribe_user(chat_id, olympiad[0])
         else:
             await message.answer("Нет активной олимпиады для отписки.")
+            start_command(message)
     else:
         await message.answer("Нет активного списка олимпиад.")
+        start_command(message)
 
 @dp.message(lambda message: message.text.startswith("❌ Отписаться от "))
 async def unsubscribe_from_list(message: types.Message):
