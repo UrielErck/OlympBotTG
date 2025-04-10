@@ -340,7 +340,7 @@ async def show_subscriptions(message: types.Message):
     user_state[user_id]="subscribe" if user_state[user_id] not in ["subscribe","unsubscribe"] else user_state[user_id]
     subscriptions = get_subscriptions(user_id)
     if subscriptions:
-        response = "Введите ID олимпиады для подписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"[{s[1]}](https://olimpiada.ru/activity/{s[0]}) (ID: {s[0]})" for s in subscriptions]) if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions])
+        response = "Введите ID олимпиады для подписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"[{s[1]}](https://olimpiada.ru/activity/{s[0]}) (ID: {s[0]})" for s in subscriptions]) if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"[{s[1]}](https://olimpiada.ru/activity/{s[0]}) (ID: {s[0]})" for s in subscriptions])
         buttons = [[KeyboardButton(text="⬅️ Вернуться на главную")]] + [[KeyboardButton(text="Сменить режим на отписку" if user_state[user_id]=="subscribe" else "Сменить режим на подписку")]] +[[KeyboardButton(text=f"❌ Отписаться от {s[1]}")] for s in subscriptions] 
         keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, parse_mode="Markdown")
         await message.answer(response, reply_markup=keyboard, parse_mode="Markdown", disable_web_page_preview=True)
