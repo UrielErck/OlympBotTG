@@ -1,6 +1,6 @@
 TOKEN = "6899460382:AAG5HK59MlnZfBM6_AHhSauov_1EaFjdFeo"
 DB_PATH = "test.db"
-SUBSCRIPTION_BACKUP_DB = "subscriptions_backup.db"
+SUBSCRIPTION_DB = "subscriptions.db"
 import sqlite3
 import json
 import asyncio
@@ -19,7 +19,23 @@ user_olympiads_state = {}
 
 # Глобальное хранилище фильтров и состояний поиска
 user_filters = {}       # {chat_id: {"subject": ..., "grade": ..., "level": ...}}
-user_filters_state = {} # {chat_id: "subject" | "grade" | "level" | None}
+user_state = {} # {chat_id: "subject" | "grade" | "level" | None}
+def init_subscription_db():
+    """Создает таблицу подписок в отдельной базе, если её нет."""
+    conn = sqlite3.connect(SUBSCRIPTION_DB)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS Subscriptions (
+            user_id INTEGER,
+            olympiad_id INTEGER,
+            PRIMARY KEY (user_id, olympiad_id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_subscription_db()
+
 
 def get_olympiads(subject=None, level=None, sort_by_rating=False):
     conn = sqlite3.connect(DB_PATH)
@@ -34,7 +50,7 @@ def get_olympiads(subject=None, level=None, sort_by_rating=False):
         params.append(f'%{json.dumps(subject)}%')
     if level and level != "Любой":
         if level == "Нет":
-            query += " AND level IS NULL"
+            query += " AND level IS -1"
         else:
             query += " AND level = ?"
             params.append(int(level))
@@ -149,6 +165,7 @@ async def send_next(chat_id: int, index: int):
 
         keyboard = ReplyKeyboardMarkup(
             keyboard=[
+                [KeyboardButton(text="⬅️ Вернуться на главную")],
                 [KeyboardButton(text="✅ Подписаться")],
                 [KeyboardButton(text="❌ Отписаться")],
                 [KeyboardButton(text="➡️ Далее")]
@@ -170,73 +187,53 @@ def send_olympiads_one_by_one(chat_id: int, olympiads: list):
     user_olympiads_state[chat_id] = {"olympiads": olympiads, "index": 0}
     asyncio.create_task(send_next(chat_id, 0))
 
-def update_backup_subscription_insert(user_id: int, olympiad_id: int):
-    conn_backup = sqlite3.connect(SUBSCRIPTION_BACKUP_DB)
-    cursor_backup = conn_backup.cursor()
-    cursor_backup.execute(
-        "CREATE TABLE IF NOT EXISTS Subscriptions (user_id INTEGER, olympiad_id INTEGER, PRIMARY KEY (user_id, olympiad_id))"
-    )
-    cursor_backup.execute(
+def subscribe_user(user_id: int, olympiad_id: int):
+    # Записываем подписку в отдельную базу данных
+    conn = sqlite3.connect(SUBSCRIPTION_DB)
+    cursor = conn.cursor()
+    cursor.execute(
         "INSERT OR IGNORE INTO Subscriptions (user_id, olympiad_id) VALUES (?, ?)",
         (user_id, olympiad_id)
     )
-    conn_backup.commit()
-    conn_backup.close()
-
-def update_backup_subscription_delete(user_id: int, olympiad_id: int):
-    conn_backup = sqlite3.connect(SUBSCRIPTION_BACKUP_DB)
-    cursor_backup = conn_backup.cursor()
-    cursor_backup.execute(
-        "CREATE TABLE IF NOT EXISTS Subscriptions (user_id INTEGER, olympiad_id INTEGER, PRIMARY KEY (user_id, olympiad_id))"
-    )
-    cursor_backup.execute(
-        "DELETE FROM Subscriptions WHERE user_id = ? AND olympiad_id = ?",
-        (user_id, olympiad_id)
-    )
-    conn_backup.commit()
-    conn_backup.close()
-
-def subscribe_user(user_id: int, olympiad_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO Subscriptions (user_id, olympiad_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
-        (user_id, olympiad_id)
-    )
     conn.commit()
     conn.close()
-    update_backup_subscription_insert(user_id, olympiad_id)
     asyncio.create_task(bot.send_message(user_id, f"Вы подписались на олимпиаду {olympiad_id}"))
 
 def unsubscribe_user(user_id: int, olympiad_id: int):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(SUBSCRIPTION_DB)
     cursor = conn.cursor()
-    cursor.execute(
-        "DELETE FROM Subscriptions WHERE user_id = ? AND olympiad_id = ?",
-        (user_id, olympiad_id)
-    )
+    cursor.execute("DELETE FROM Subscriptions WHERE user_id = ? AND olympiad_id = ?", (user_id, olympiad_id))
     conn.commit()
     conn.close()
-    update_backup_subscription_delete(user_id, olympiad_id)
     asyncio.create_task(bot.send_message(user_id, f"Вы отписались от олимпиады {olympiad_id}"))
 
 def get_subscriptions(user_id: int):
+    # Получаем список подписок из отдельной базы данных, затем достаем данные об олимпиадах из основной базы
+    conn_sub = sqlite3.connect(SUBSCRIPTION_DB)
+    cursor = conn_sub.cursor()
+    cursor.execute("SELECT olympiad_id FROM Subscriptions WHERE user_id = ?", (user_id,))
+    olympiad_ids = cursor.fetchall()
+    conn_sub.close()
+    results = []
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT o.id, o.name FROM Olympiads o JOIN Subscriptions s ON o.id = s.olympiad_id WHERE s.user_id = ?",
-        (user_id,)
-    )
-    results = cursor.fetchall()
+    for (oid,) in olympiad_ids:
+        cursor.execute("SELECT id, name FROM Olympiads WHERE id = ?", (oid,))
+        row = cursor.fetchone()
+        if row:
+            results.append(row)
     conn.close()
     return results
 
 def check_notifications():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    # Выбираем подписки из отдельной базы
+    conn_sub = sqlite3.connect(SUBSCRIPTION_DB)
+    cursor = conn_sub.cursor()
     cursor.execute("SELECT user_id, olympiad_id FROM Subscriptions")
     subscriptions = cursor.fetchall()
-    
+    conn_sub.close()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
     for user_id, olympiad_id in subscriptions:
         cursor.execute("SELECT name, events FROM Olympiads WHERE id = ?", (olympiad_id,))
         result = cursor.fetchone()
@@ -255,27 +252,12 @@ def check_notifications():
                 pass
     conn.close()
 
-def backup_subscriptions():
-    # Периодическое резервное копирование оставлено для совместимости
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM Subscriptions")
-    subscriptions = cursor.fetchall()
-    conn.close()
-    conn_backup = sqlite3.connect(SUBSCRIPTION_BACKUP_DB)
-    cursor_backup = conn_backup.cursor()
-    cursor_backup.execute(
-        "CREATE TABLE IF NOT EXISTS Subscriptions (user_id INTEGER, olympiad_id INTEGER, PRIMARY KEY (user_id, olympiad_id))"
-    )
-    cursor_backup.execute("DELETE FROM Subscriptions")
-    cursor_backup.executemany("INSERT INTO Subscriptions (user_id, olympiad_id) VALUES (?, ?)", subscriptions)
-    conn_backup.commit()
-    conn_backup.close()
 
 # --- Обработчики поиска олимпиад с фильтрами ---
 
-@dp.message(lambda message: message.text == "/start")
+@dp.message(lambda message: message.text == "/start" or message.text == "⬅️ Вернуться на главную")
 async def start_command(message: types.Message):
+    user_state[message.chat.id] = ""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🔍 Найти олимпиады")],
@@ -289,50 +271,50 @@ async def start_command(message: types.Message):
 async def start_search(message: types.Message):
     chat_id = message.chat.id
     user_filters[chat_id] = {}
-    user_filters_state[chat_id] = "subject"
+    user_state[chat_id] = "subject"
     subjects = get_all_subjects()
     subjects.sort()
-    options = ["Любой"] + subjects
+    options = ["⬅️ Вернуться на главную"] + ["Любой"] + subjects 
     keyboard = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=opt)] for opt in options],
         resize_keyboard=True
     )
     await message.answer("Выберите предмет:", reply_markup=keyboard)
 
-@dp.message(lambda message: user_filters_state.get(message.chat.id) == "subject")
+@dp.message(lambda message: user_state.get(message.chat.id) == "subject")
 async def handle_subject(message: types.Message):
     chat_id = message.chat.id
     chosen = message.text
     user_filters[chat_id]["subject"] = chosen
-    user_filters_state[chat_id] = "grade"
+    user_state[chat_id] = "grade"
     grades = get_all_grades()
-    options = ["Любой"] + grades
+    options = ["⬅️ Вернуться на главную"] + ["Любой"] + grades
     keyboard = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=opt)] for opt in options],
         resize_keyboard=True
     )
     await message.answer("Выберите класс:", reply_markup=keyboard)
 
-@dp.message(lambda message: user_filters_state.get(message.chat.id) == "grade")
+@dp.message(lambda message: user_state.get(message.chat.id) == "grade")
 async def handle_grade(message: types.Message):
     chat_id = message.chat.id
     chosen = message.text
     user_filters[chat_id]["grade"] = chosen
-    user_filters_state[chat_id] = "level"
+    user_state[chat_id] = "level"
     levels = get_all_levels()
-    options = levels  # уже включает "Любой" и "Нет"
+    options = ["⬅️ Вернуться на главную"] + levels  # уже включает "Любой" и "Нет"
     keyboard = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text=opt)] for opt in options],
         resize_keyboard=True
     )
     await message.answer("Выберите уровень:", reply_markup=keyboard)
 
-@dp.message(lambda message: user_filters_state.get(message.chat.id) == "level")
+@dp.message(lambda message: user_state.get(message.chat.id) == "level")
 async def handle_level(message: types.Message):
     chat_id = message.chat.id
     chosen = message.text
     user_filters[chat_id]["level"] = chosen
-    user_filters_state[chat_id] = None
+    user_state[chat_id] = None
     filters = user_filters.get(chat_id, {})
     subject = filters.get("subject")
     grade = filters.get("grade")
@@ -347,22 +329,39 @@ async def handle_level(message: types.Message):
         await send_next(chat_id, 0)
     else:
         await message.answer("По заданным фильтрам олимпиад не найдено.")
-        start_command(message)
+        await start_command(message)
 
 # --- Обработчики подписки, отписки и листания ---
 
 @dp.message(lambda message: message.text == "📋 Мои подписки")
 async def show_subscriptions(message: types.Message):
     user_id = message.chat.id
+    user_state[user_id]="subscribe" if user_state[user_id] not in ["subscribe","unsubscribe"] else user_state[user_id]
     subscriptions = get_subscriptions(user_id)
     if subscriptions:
-        response = "Ваши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions])
-        buttons = [[KeyboardButton(text=f"❌ Отписаться от {s[1]}")] for s in subscriptions]
+        response = "Введите ID олимпиады для подписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions]) if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions])
+        buttons = [[KeyboardButton(text="⬅️ Вернуться на главную")]] + [[KeyboardButton(text="Сменить режим на отписку" if user_state[user_id]=="subscribe" else "Сменить режим на подписку")]] +[[KeyboardButton(text=f"❌ Отписаться от {s[1]}")] for s in subscriptions] 
+        print(buttons)
         keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
         await message.answer(response, reply_markup=keyboard)
     else:
-        await message.answer("У вас нет подписок.")
-        start_command(message)
+        response = "Введите ID олимпиады для подписки"+"\nПодписок нет." if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки"+"\nПодписок нет."
+        buttons = [[KeyboardButton(text="⬅️ Вернуться на главную")]] + [[KeyboardButton(text="Сменить режим на отписку" if user_state[user_id]=="subscribe" else "Сменить режим на подписку")]] +[[KeyboardButton(text=f"❌ Отписаться от {s[1]}")] for s in subscriptions] 
+        print(buttons)
+        keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+        await message.answer(response, reply_markup=keyboard)
+
+@dp.message(lambda message: message.text == "Сменить режим на подписку" or message.text == "Сменить режим на отписку")
+async def change_subscribe_mode(message: types.Message):
+    chat_id = message.chat.id
+    if message.text == "Сменить режим на подписку":
+        user_state[chat_id]="subscribe"
+        await message.answer("Изменено на режим подписки")
+    else: 
+        user_state[chat_id]="unsubscribe"
+        await message.answer("Изменено на режим отписки")
+    await show_subscriptions(message)
+    
 
 @dp.message(lambda message: message.text == "➡️ Далее")
 async def next_olympiad(message: types.Message):
@@ -373,8 +372,9 @@ async def next_olympiad(message: types.Message):
         await send_next(chat_id, index)
     else:
         await message.answer("Нет активного списка олимпиад.")
-        start_command(message)
-        
+        await start_command(message)
+
+
 
 @dp.message(lambda message: message.text == "✅ Подписаться")
 async def subscribe_current(message: types.Message):
@@ -388,10 +388,10 @@ async def subscribe_current(message: types.Message):
             subscribe_user(chat_id, olympiad[0])
         else:
             await message.answer("Нет активной олимпиады для подписки.")
-            start_command(message)
+            await start_command(message)
     else:
         await message.answer("Нет активного списка олимпиад.")
-        start_command(message)
+        await start_command(message)
 
 @dp.message(lambda message: message.text == "❌ Отписаться")
 async def unsubscribe_current(message: types.Message):
@@ -405,30 +405,46 @@ async def unsubscribe_current(message: types.Message):
             unsubscribe_user(chat_id, olympiad[0])
         else:
             await message.answer("Нет активной олимпиады для отписки.")
-            start_command(message)
+            await start_command(message)
     else:
         await message.answer("Нет активного списка олимпиад.")
-        start_command(message)
+        await start_command(message)
 
-@dp.message(lambda message: message.text.startswith("❌ Отписаться от "))
+@dp.message(lambda message: user_state.get(message.chat.id) == "subscribe" and not message.text.startswith("❌ Отписаться от "))
+async def subscribe_from_list(message: types.Message):
+    chat_id = message.chat.id
+    try:
+        subscribe_user(chat_id, int(message.text))
+        await show_subscriptions(message)
+    except:
+        await message.answer("Олимпиада не найдена.")
+        await show_subscriptions(message)
+@dp.message(lambda message: message.text.startswith("❌ Отписаться от ") or user_state.get(message.chat.id) == "unsubscribe")
 async def unsubscribe_from_list(message: types.Message):
     user_id = message.chat.id
-    olympiad_name = message.text.replace("❌ Отписаться от ", "")
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM Olympiads WHERE name = ?", (olympiad_name,))
-    result = cursor.fetchone()
-    conn.close()
-    if result:
-        unsubscribe_user(user_id, result[0])
+    if message.text.startswith("❌ Отписаться от "):
+        olympiad_name = message.text.replace("❌ Отписаться от ", "")
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM Olympiads WHERE name = ?", (olympiad_name,))
+        result = cursor.fetchone()
+        conn.close()
+        if result:
+            unsubscribe_user(user_id, result[0])
+            await show_subscriptions(message)
+        else:
+            await message.answer("Олимпиада не найдена.")
     else:
-        await message.answer("Олимпиада не найдена.")
-
+        try:
+            unsubscribe_user(user_id, int(message.text))
+            await show_subscriptions(message)
+        except:
+            await message.answer("Олимпиада не найдена.")
+            await show_subscriptions(message)
 async def daily_tasks():
     while True:
-        await asyncio.sleep(BACKUP_INTERVAL)
+        await asyncio.sleep(10)
         check_notifications()
-        backup_subscriptions()
 
 async def main():
     asyncio.create_task(daily_tasks())
