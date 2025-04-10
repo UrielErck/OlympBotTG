@@ -256,9 +256,9 @@ def check_notifications():
 
 # --- Обработчики поиска олимпиад с фильтрами ---
 
-@dp.message(lambda message: message.text == "/start" or message.text == "⬅️ Вернуться на главную")
+@dp.message(lambda message: message.text == "/start" or message.text == "⬅️ Вернуться на главную" or user_state.get(message.chat.id) is None)
 async def start_command(message: types.Message):
-    user_state[message.chat.id] = ""
+    user_state[message.chat.id] = "start"
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🔍 Найти олимпиады")],
@@ -315,7 +315,7 @@ async def handle_level(message: types.Message):
     chat_id = message.chat.id
     chosen = message.text
     user_filters[chat_id]["level"] = chosen
-    user_state[chat_id] = None
+    user_state[chat_id] = "search"
     filters = user_filters.get(chat_id, {})
     subject = filters.get("subject")
     grade = filters.get("grade")
@@ -412,10 +412,14 @@ async def unsubscribe_current(message: types.Message):
 @dp.message(lambda message: user_state.get(message.chat.id) == "subscribe" and not message.text.startswith("❌ Отписаться от "))
 async def subscribe_from_list(message: types.Message):
     chat_id = message.chat.id
-    try:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM Olympiads WHERE id = ?", (message.text,))
+    result = cursor.fetchone()
+    if result:
         subscribe_user(chat_id, int(message.text))
         await show_subscriptions(message)
-    except:
+    else:
         await message.answer("Олимпиада не найдена.")
         await show_subscriptions(message)
 @dp.message(lambda message: message.text.startswith("❌ Отписаться от ") or user_state.get(message.chat.id) == "unsubscribe")
@@ -434,10 +438,14 @@ async def unsubscribe_from_list(message: types.Message):
         else:
             await message.answer("Олимпиада не найдена.")
     else:
-        try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM Olympiads WHERE id = ?", (message.text,))
+        result = cursor.fetchone()
+        if result:
             unsubscribe_user(user_id, int(message.text))
             await show_subscriptions(message)
-        except:
+        else:
             await message.answer("Олимпиада не найдена.")
             await show_subscriptions(message)
 async def daily_tasks():
