@@ -9,7 +9,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from datetime import datetime
 
 # Укажите реальный токен бота
-BACKUP_INTERVAL = 86400  # время в секундах между сохранениями подписок (по умолчанию раз в день)
+CHECK_INTERVAL = 86400  # время в секундах между сохранениями подписок (по умолчанию раз в день)
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -441,8 +441,8 @@ async def unsubscribe_from_list(message: types.Message):
             await show_subscriptions(message)
 async def daily_tasks():
     while True:
-        await asyncio.sleep(10)
         check_notifications()
+        await asyncio.sleep(CHECK_INTERVAL)
 
 async def main():
     asyncio.create_task(daily_tasks())
