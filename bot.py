@@ -274,7 +274,7 @@ async def start_command(message: types.Message):
 async def start_search(message: types.Message):
     chat_id = message.chat.id
     user_filters[chat_id] = {}
-    user_state[chat_id] = "subject"
+    user_state[chat_id] = "subject" 
     subjects = get_all_subjects()
     subjects.sort()
     options = ["⬅️ Вернуться на главную"] + ["Любой"] + subjects 
@@ -288,7 +288,7 @@ async def start_search(message: types.Message):
 async def handle_subject(message: types.Message):
     chat_id = message.chat.id
     chosen = message.text
-    user_filters[chat_id]["subject"] = chosen
+    user_filters[chat_id]["subject"] = chosen if chosen in get_all_subjects() else "Любой"
     user_state[chat_id] = "grade"
     grades = get_all_grades()
     options = ["⬅️ Вернуться на главную"] + ["Любой"] + grades
@@ -302,7 +302,7 @@ async def handle_subject(message: types.Message):
 async def handle_grade(message: types.Message):
     chat_id = message.chat.id
     chosen = message.text
-    user_filters[chat_id]["grade"] = chosen
+    user_filters[chat_id]["grade"] = chosen if chosen in get_all_grades() else "Любой"
     user_state[chat_id] = "level"
     levels = get_all_levels()
     options = ["⬅️ Вернуться на главную"] + levels  # уже включает "Любой" и "Нет"
@@ -316,7 +316,7 @@ async def handle_grade(message: types.Message):
 async def handle_level(message: types.Message):
     chat_id = message.chat.id
     chosen = message.text
-    user_filters[chat_id]["level"] = chosen
+    user_filters[chat_id]["level"] = chosen if chosen in get_all_levels() else "Любой"
     user_state[chat_id] = "search"
     filters = user_filters.get(chat_id, {})
     subject = filters.get("subject")
