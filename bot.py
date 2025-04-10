@@ -1,6 +1,5 @@
-TOKEN = "6899460382:AAG5HK59MlnZfBM6_AHhSauov_1EaFjdFeo"
-DB_PATH = "test.db"
-SUBSCRIPTION_DB = "subscriptions.db"
+from os import environ
+from dotenv import load_dotenv
 import sqlite3
 import json
 import asyncio
@@ -8,7 +7,10 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from datetime import datetime
 
-# Укажите реальный токен бота
+load_dotenv()
+TOKEN = environ["TOKEN"]
+DB_PATH = environ["DB_PATH"]
+SUBSCRIPTION_DB = environ["SUBSCRIPTION_DB"]
 CHECK_INTERVAL = 86400  # время в секундах между сохранениями подписок (по умолчанию раз в день)
 
 bot = Bot(token=TOKEN)

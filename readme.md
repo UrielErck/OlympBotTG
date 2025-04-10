@@ -38,6 +38,21 @@ file = sqlite3.connect('test.db')
 parser.parce(file)
 ```
 Итогом будет что он сохраняет в открытую БД таблицу с олимпиадами
+## Чтобы начать пользование
+
+Создать виртуальную среду и активировать ее. Установить нужные пакеты
+```bash
+python3 -m venv .venv # Создаем виртуальную среду
+source .venv/bin/activate # Активируем ее
+pip3 install requirements # Установка зависимостей
+```
+Создать .env файл c этими полями
+```python
+TOKEN = "<botToken>"
+DB_PATH = "<path to olimpiad db>"
+SUBSCRIPTION_DB = "<path to subscriptions db"
+```
+
 
 ### Структура БД
 В БД есть 1 таблица `Olimpiad` со следующими колонками:
