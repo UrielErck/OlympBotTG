@@ -137,7 +137,8 @@ async def send_next(chat_id: int, index: int):
                 f"Уровень: {level_text}\n"
                 f"Классы: {grade_text}\n"
                 f"Рейтинг: {olympiad[3]}\n"
-                f"ID: {olympiad[0]}\n"
+                f"ID: {olympiad[0]} - "
+                f"https://olimpiada.ru/activity/{olympiad[0]}\n"
                 f"Описание: {olympiad[4]}\n"
                 f"Предметы: {" ".join(json.loads(olympiad[6]))}\n")
         # Обработка этапов (поле events, индекс 7)
@@ -247,7 +248,7 @@ def check_notifications():
                     if start_ts and start_ts != -1:
                         event_date = datetime.fromtimestamp(start_ts).strftime('%Y-%m-%d')
                         if event_date == today:
-                            asyncio.create_task(bot.send_message(user_id, f"🏆 Сегодня начинается этап: {event.get('Name', 'Этап')} олимпиады {name}!"))
+                            asyncio.create_task(bot.send_message(user_id, f'🏆 Сегодня начинается этап: "{event.get('Name', 'Этап')}" олимпиады "{name}"!\nhttps://olimpiada.ru/activity/{olympiad_id}'))
             except Exception:
                 pass
     conn.close()
@@ -339,10 +340,10 @@ async def show_subscriptions(message: types.Message):
     user_state[user_id]="subscribe" if user_state[user_id] not in ["subscribe","unsubscribe"] else user_state[user_id]
     subscriptions = get_subscriptions(user_id)
     if subscriptions:
-        response = "Введите ID олимпиады для подписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions]) if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions])
+        response = "Введите ID олимпиады для подписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"[{s[1]}](https://olimpiada.ru/activity/{s[0]}) (ID: {s[0]})" for s in subscriptions]) if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions])
         buttons = [[KeyboardButton(text="⬅️ Вернуться на главную")]] + [[KeyboardButton(text="Сменить режим на отписку" if user_state[user_id]=="subscribe" else "Сменить режим на подписку")]] +[[KeyboardButton(text=f"❌ Отписаться от {s[1]}")] for s in subscriptions] 
-        keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
-        await message.answer(response, reply_markup=keyboard)
+        keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, parse_mode="Markdown")
+        await message.answer(response, reply_markup=keyboard, parse_mode="Markdown", disable_web_page_preview=True)
     else:
         response = "Введите ID олимпиады для подписки"+"\nПодписок нет." if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки"+"\nПодписок нет."
         buttons = [[KeyboardButton(text="⬅️ Вернуться на главную")]] + [[KeyboardButton(text="Сменить режим на отписку" if user_state[user_id]=="subscribe" else "Сменить режим на подписку")]] +[[KeyboardButton(text=f"❌ Отписаться от {s[1]}")] for s in subscriptions] 
