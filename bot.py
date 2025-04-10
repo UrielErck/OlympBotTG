@@ -341,13 +341,11 @@ async def show_subscriptions(message: types.Message):
     if subscriptions:
         response = "Введите ID олимпиады для подписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions]) if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки или нажмите на кнопки"+"\nВаши подписки:\n" + "\n".join([f"{s[1]} (ID: {s[0]})" for s in subscriptions])
         buttons = [[KeyboardButton(text="⬅️ Вернуться на главную")]] + [[KeyboardButton(text="Сменить режим на отписку" if user_state[user_id]=="subscribe" else "Сменить режим на подписку")]] +[[KeyboardButton(text=f"❌ Отписаться от {s[1]}")] for s in subscriptions] 
-        print(buttons)
         keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
         await message.answer(response, reply_markup=keyboard)
     else:
         response = "Введите ID олимпиады для подписки"+"\nПодписок нет." if user_state[user_id]=="subscribe" else "Введите ID олимпиады для отписки"+"\nПодписок нет."
         buttons = [[KeyboardButton(text="⬅️ Вернуться на главную")]] + [[KeyboardButton(text="Сменить режим на отписку" if user_state[user_id]=="subscribe" else "Сменить режим на подписку")]] +[[KeyboardButton(text=f"❌ Отписаться от {s[1]}")] for s in subscriptions] 
-        print(buttons)
         keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
         await message.answer(response, reply_markup=keyboard)
 
