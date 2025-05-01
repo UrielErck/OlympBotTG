@@ -44,7 +44,7 @@ parser.parce(file)
 ```bash
 python3 -m venv .venv # Создаем виртуальную среду
 source .venv/bin/activate # Активируем ее
-pip3 install requirements # Установка зависимостей
+pip3 install -r requirements.txt # Установка зависимостей
 ```
 Создать .env файл c этими полями
 ```python
