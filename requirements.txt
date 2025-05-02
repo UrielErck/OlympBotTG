@@ -1,1 +1,5 @@
-python-dotenv asyncio aiogram lxml requests
+python-dotenv
+asyncio
+aiogram
+lxml
+requests
